@@ -92,14 +92,30 @@ func Login(ctx *gin.Context) {
 		ctx.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "密碼錯誤"})
 		return
 	}
+
 	// 發放 token
-	token := "4444"
+	token, err := common.ReleaseToken(user)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "系統異常"})
+		log.Printf("token generate error : %v", err)
+		return
+	}
 
 	// 返回結果
 	ctx.JSON(200, gin.H{
 		"code": 200,
 		"data": gin.H{"token": token},
 		"msg":  "登入成功",
+	})
+}
+
+func Info(ctx *gin.Context) {
+	user, _ := ctx.Get("user")
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"code":    200,
+		"message": "Info",
+		"data":    gin.H{"user": user},
 	})
 }
 
