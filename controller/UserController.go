@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"example.com/ginessential/common"
+	"example.com/ginessential/dto"
 	"example.com/ginessential/model"
+	"example.com/ginessential/response"
 	"example.com/ginessential/util"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -22,11 +24,11 @@ func Register(ctx *gin.Context) {
 
 	// 數據驗證
 	if len(telephone) != 11 {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "手機號碼必須為11位"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 421, nil, "手機號碼必須為11位")
 		return
 	}
 	if len(password) < 6 {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "密碼不能少於6位"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 422, nil, "密碼不能少於6位")
 		return
 	}
 	// 如果名稱沒有傳，給一個10位的隨機字串
@@ -38,14 +40,14 @@ func Register(ctx *gin.Context) {
 
 	// 判斷手機號碼是否存在
 	if isTelephoneExist(DB, telephone) {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "用戶已經存在"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 423, nil, "用戶已經存在")
 		return
 	}
 
 	// 創建用戶
 	hasedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "加密錯誤"})
+		response.Response(ctx, http.StatusInternalServerError, 500, nil, "加密錯誤")
 		return
 	}
 
@@ -57,10 +59,7 @@ func Register(ctx *gin.Context) {
 	DB.Create(&newUser)
 
 	// 返回結果
-	ctx.JSON(200, gin.H{
-		"code": 200,
-		"msg":  "註冊成功",
-	})
+	response.Success(ctx, nil, "註冊成功")
 }
 
 func Login(ctx *gin.Context) {
@@ -72,11 +71,11 @@ func Login(ctx *gin.Context) {
 
 	// 數據驗證
 	if len(telephone) != 11 {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "手機號碼必須為11位"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 421, nil, "手機號碼必須為11位")
 		return
 	}
 	if len(password) < 6 {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "密碼不能少於6位"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 422, nil, "密碼不能少於6位")
 		return
 	}
 
@@ -84,39 +83,31 @@ func Login(ctx *gin.Context) {
 	var user model.User
 	DB.Where("telephone = ?", telephone).First(&user)
 	if user.ID == 0 {
-		ctx.JSON(http.StatusUnprocessableEntity, gin.H{"code": 422, "msg": "用戶不存在"})
+		response.Response(ctx, http.StatusUnprocessableEntity, 424, nil, "用戶不存在")
 	}
 
 	// 判斷密碼是否正確
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"code": 400, "msg": "密碼錯誤"})
+		response.Response(ctx, http.StatusBadRequest, 400, nil, "密碼錯誤")
 		return
 	}
 
 	// 發放 token
 	token, err := common.ReleaseToken(user)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "msg": "系統異常"})
+		response.Response(ctx, http.StatusInternalServerError, 500, nil, "系統異常")
 		log.Printf("token generate error : %v", err)
 		return
 	}
 
 	// 返回結果
-	ctx.JSON(200, gin.H{
-		"code": 200,
-		"data": gin.H{"token": token},
-		"msg":  "登入成功",
-	})
+	response.Success(ctx, gin.H{"token": token}, "登入成功")
 }
 
 func Info(ctx *gin.Context) {
 	user, _ := ctx.Get("user")
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"code":    200,
-		"message": "Info",
-		"data":    gin.H{"user": user},
-	})
+	response.Success(ctx, gin.H{"user": dto.ToUserDto(user.(model.User))}, "登入訊息")
 }
 
 func isTelephoneExist(db *gorm.DB, telephone string) bool {
